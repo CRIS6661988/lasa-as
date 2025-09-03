@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Heart } from 'lucide-react';
 
 const initialProducts = [
@@ -38,11 +38,18 @@ const initialProducts = [
     line: 'vegetariana',
     tags: ['vegetariana'],
   },
-  // añade más productos aquí…
+  // ... más productos si deseas
 ];
 
 export default function App() {
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState(() => {
+    const savedCart = localStorage.getItem('cart');
+    return savedCart ? JSON.parse(savedCart) : [];
+  });
+  const [favorites, setFavorites] = useState(() => {
+    const savedFavs = localStorage.getItem('favorites');
+    return savedFavs ? JSON.parse(savedFavs) : [];
+  });
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState({
     types: new Set(),
@@ -51,10 +58,45 @@ export default function App() {
     maxPrice: Infinity,
   });
 
-  // funciones de carrito
-  const addToCart = (product) => setCart((c) => [...c, product]);
+  useEffect(() => {
+    localStorage.setItem('cart', JSON.stringify(cart));
+  }, [cart]);
 
-  // filtros aplicados
+  useEffect(() => {
+    localStorage.setItem('favorites', JSON.stringify(favorites));
+  }, [favorites]);
+
+  const addToCart = (product) => {
+    setCart((c) => [...c, product]);
+  };
+
+  const toggleFilter = (category, value) => {
+    setFilters((f) => {
+      const newSet = new Set(f[category]);
+      if (newSet.has(value)) newSet.delete(value);
+      else newSet.add(value);
+      return { ...f, [category]: newSet };
+    });
+  };
+
+  const handleCheckout = () => {
+    alert(
+      'El proceso de pago aún está en desarrollo. Contáctanos por WhatsApp para realizar tu pedido.'
+    );
+  };
+
+  const toggleFavorite = (productId) => {
+    setFavorites((prev) => {
+      if (prev.includes(productId)) {
+        return prev.filter((id) => id !== productId);
+      } else {
+        return [...prev, productId];
+      }
+    });
+  };
+
+  const isFavorited = (productId) => favorites.includes(productId);
+
   const filtered = initialProducts
     .filter((p) =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -71,30 +113,28 @@ export default function App() {
     )
     .filter((p) => p.price <= filters.maxPrice);
 
-  // manejo de checkboxes
-  const toggleFilter = (category, value) => {
-    setFilters((f) => {
-      const newSet = new Set(f[category]);
-      newSet.has(value) ? newSet.delete(value) : newSet.add(value);
-      return { ...f, [category]: newSet };
-    });
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-800">
-      <header className="bg-red-600 text-white p-4">
-        <h1 className="text-3xl font-bold">Catálogo de Lasañas</h1>
+    <div className="min-h-screen flex flex-col bg-gray-50 text-gray-800">
+      <header className="bg-red-600 text-white p-4 flex flex-col space-y-2">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Catálogo de Lasañas</h1>
+          <button
+            onClick={handleCheckout}
+            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+          >
+            Proceder al pago
+          </button>
+        </div>
         <input
           type="text"
-          className="mt-2 p-2 w-full sm:w-1/3 text-black rounded"
+          className="p-2 w-full sm:w-1/3 text-black rounded"
           placeholder="Buscar…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
       </header>
 
-      <main className="flex">
-        {/* Filtro lateral */}
+      <main className="flex flex-1">
         <aside className="w-64 p-4 bg-white border-r hidden md:block">
           <h2 className="font-semibold mb-2">Filtros</h2>
           <div className="mb-4">
@@ -121,7 +161,7 @@ export default function App() {
                   onChange={() => toggleFilter('weights', w)}
                   checked={filters.weights.has(w)}
                 />
-                {w} g
+                {w} g
               </label>
             ))}
           </div>
@@ -158,7 +198,6 @@ export default function App() {
           </div>
         </aside>
 
-        {/* Grid de productos */}
         <section className="flex-1 p-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filtered.map((p) => (
@@ -173,7 +212,9 @@ export default function App() {
                 />
                 <div className="p-4">
                   <h3 className="font-semibold text-xl mb-2">{p.name}</h3>
-                  <p className="text-sm text-gray-600">{p.weight} g • {p.type}</p>
+                  <p className="text-sm text-gray-600">
+                    {p.weight} g • {p.type}
+                  </p>
                   <p className="mt-1">{p.description}</p>
                   <div className="mt-3 flex items-center justify-between">
                     <div>
@@ -193,8 +234,16 @@ export default function App() {
                       >
                         <Plus size={18} />
                       </button>
-                      <button className="text-red-500 hover:text-red-600 p-2">
-                        <Heart size={18} />
+                      <button
+                        onClick={() => toggleFavorite(p.id)}
+                        className="text-red-500 hover:text-red-600 p-2"
+                      >
+                        <Heart
+                          size={18}
+                          strokeWidth={2.5}
+                          color={isFavorited(p.id) ? '#e3342f' : 'currentColor'}
+                          fill={isFavorited(p.id) ? '#e3342f' : 'none'}
+                        />
                       </button>
                     </div>
                   </div>
@@ -203,11 +252,23 @@ export default function App() {
             ))}
           </div>
           {filtered.length === 0 && (
-            <p className="mt-4 text-gray-500">No hay productos que coincidan con tus filtros.</p>
+            <p className="mt-4 text-gray-500">
+              No hay productos que coincidan con tus filtros.
+            </p>
           )}
         </section>
       </main>
+
+      <footer className="bg-gray-800 text-white p-4">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="text-xl font-semibold mb-2">Contáctanos</h2>
+          <p>WhatsApp: +51 999 999 999</p>
+          <p>Email: info@mislasanas.com</p>
+          <p>Instagram: @mislasanas</p>
+        </div>
+      </footer>
     </div>
   );
 }
+
 
